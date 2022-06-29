@@ -45,3 +45,25 @@ enum {
 // GPPUPPDN0
 
 // enumerations for UART registers
+enum {
+  DR = UART_BASE + 0x00,
+  RSRECR = UART_BASE + 0x04,
+  FR = UART_BASE + 0x18,
+  ILPR = UART_BASE + 0x20,
+  IBRD = UART_BASE + 0x24,
+  FBRD = UART_BASE + 0x28,
+  LCRH = UART_BASE + 0x2c,
+  CR = UART_BASE + 0x30,
+  IFLS = UART_BASE + 0x34,
+  IMSC = UART_BASE + 0x38,
+  RIS = UART_BASE + 0x3c,
+  MIS = UART_BASE + 0x40,
+  ICR = UART_BASE + 0x44,
+  DMACR = UART_BASE + 0x48,
+  ITCR = UART_BASE + 0x80,
+  ITIP = UART_BASE + 0x84,
+  ITOP = UART_BASE + 0x88,
+  TDR = UART_BASE + 0x8c,
+};
+
+
