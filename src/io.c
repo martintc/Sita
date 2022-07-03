@@ -1,6 +1,16 @@
-#define GPIO_REG_BASE 0x7e200000
+#include "io.h"
 
-#define UART_BASE 0x7e201000 // for UART0
+#define GPIO_REG_BASE 0xFE000000
+#define AUX_BASE GPIO_REG_BASE + 0x215000 // for UART0
+
+#define ALT5 0x2
+
+// resistor enums
+enum {
+  PULL_NONE = 0,
+  PULL_DOWN = 1,
+  PULL_UP = 2,
+};
 
 // enumerations for GPIO registers
 enum {
@@ -36,34 +46,79 @@ enum {
   GPIO_PUP_PDN_CNTRL_REG3 = GPIO_REG_BASE + 0xf0,
 };
 
-// GPFSEL0 FSELn field determines the functionality of the nth GPIO pins// 
-
-// GPSET0 ouput set register
-
-// GPCLR0
-
-// GPPUPPDN0
-
-// enumerations for UART registers
+// mini uart enums for AUX
 enum {
-  DR = UART_BASE + 0x00,
-  RSRECR = UART_BASE + 0x04,
-  FR = UART_BASE + 0x18,
-  ILPR = UART_BASE + 0x20,
-  IBRD = UART_BASE + 0x24,
-  FBRD = UART_BASE + 0x28,
-  LCRH = UART_BASE + 0x2c,
-  CR = UART_BASE + 0x30,
-  IFLS = UART_BASE + 0x34,
-  IMSC = UART_BASE + 0x38,
-  RIS = UART_BASE + 0x3c,
-  MIS = UART_BASE + 0x40,
-  ICR = UART_BASE + 0x44,
-  DMACR = UART_BASE + 0x48,
-  ITCR = UART_BASE + 0x80,
-  ITIP = UART_BASE + 0x84,
-  ITOP = UART_BASE + 0x88,
-  TDR = UART_BASE + 0x8c,
+  AUX_IRQ = AUX_BASE,
+  AUX_ENABLES = AUX_BASE + 0x04,
+  AUX_MU_IO_REG = AUX_BASE + 0x40,
+  AUX_MU_IER_REG = AUX_BASE + 0x44,
+  AUX_MU_IIR_REG = AUX_BASE + 0x48,
+  AUX_MU_LCR_REG = AUX_BASE + 0x4c,
+  AUX_MU_MCR_REG = AUX_BASE + 0x50,
+  AUX_MU_LSR_REG = AUX_BASE + 0x54,
+  AUX_MU_MSR_REG = AUX_BASE + 0x58,
+  AUX_MU_SCRATCH = AUX_BASE + 0x5c,
+  AUX_MU_CNTL_REG = AUX_BASE + 0x60,
+  AUX_MU_STAT_REG = AUX_BASE + 0x64,
+  AUX_MU_BAUD_REG = AUX_BASE + 0x68,
 };
 
+void write_to_register(long reg, unsigned int val) { 
+  *(volatile unsigned int *)reg = val; 
+}
+
+unsigned int read_from_register(long reg) {
+  return *(volatile unsigned int *)reg;
+}
+
+void clear_register_32(long reg)
+{
+  *(volatile unsigned int *)reg = 0x0000;
+}
+
+void modify_register(long reg, unsigned int value)
+{
+  *(volatile unsigned int *)reg |= value;
+}
+
+void initialize_uart_pins() {
+  // pull up/pull down register
+  modify_register(GPIO_PUP_PDN_CNTRL_REG0, (0b00 << 30));
+  modify_register(GPIO_PUP_PDN_CNTRL_REG0, (0b00 << 28));
+  clear_register_32(GPFSEL1);
+  modify_register(GPFSEL1, (0x2 << 12));
+  modify_register(GPFSEL1, (0x2 << 15));
+}
+  
+void uart_init() {
+  // enable the mini UART
+  write_to_register(AUX_ENABLES, 0x01);
+  // no interrupts needed
+  write_to_register(AUX_MU_IER_REG, 0x00);
+  write_to_register(AUX_MU_CNTL_REG, 0x00);
+  write_to_register(AUX_MU_LCR_REG, 0x03);
+  write_to_register(AUX_MU_MCR_REG, 0x00);
+  write_to_register(AUX_MU_IER_REG, 0x00);
+  write_to_register(AUX_MU_IIR_REG, 0xc6);
+  write_to_register(AUX_MU_BAUD_REG, 270); // setting a 115200 baud rate
+  // set gpio pins to ALT15
+  initialize_uart_pins();
+  // enable RX/TX
+  write_to_register(AUX_MU_CNTL_REG, 0b11);
+}
+
+unsigned int is_ready_write() {
+  return read_from_register(AUX_MU_LSR_REG) & 0x20;
+}
+
+void write_byte(unsigned char b) {
+  while(!is_ready_write());
+  write_to_register(AUX_MU_IO_REG, (unsigned int)b);
+}
+
+void write_to_uart(char *data) {
+  while (*data) {
+    write_byte(*data++);
+  }
+}
 
