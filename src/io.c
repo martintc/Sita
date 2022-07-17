@@ -1,7 +1,7 @@
 #include "io.h"
-
-#define GPIO_REG_BASE 0xFE000000
-#define AUX_BASE GPIO_REG_BASE + 0x215000 // for UART0
+#define PBASE 0xFE000000
+#define GPIO_REG_BASE (PBASE + 0x00200000)
+#define AUX_BASE (PBASE + 0x00215000)
 
 #define ALT5 0x2
 
@@ -63,6 +63,13 @@ enum {
   AUX_MU_BAUD_REG = AUX_BASE + 0x68,
 };
 
+void delay() {
+  volatile int i = 0;
+  while (i < 150) {
+    i++;
+  }
+}
+
 void write_to_register(long reg, unsigned int val) { 
   *(volatile unsigned int *)reg = val; 
 }
@@ -84,31 +91,37 @@ void modify_register(long reg, unsigned int value)
 void initialize_uart_pins() {
   // pull up/pull down register
   modify_register(GPIO_PUP_PDN_CNTRL_REG0, (0b00 << 30));
+  delay();
   modify_register(GPIO_PUP_PDN_CNTRL_REG0, (0b00 << 28));
+  delay();
   clear_register_32(GPFSEL1);
   modify_register(GPFSEL1, (0x2 << 12));
   modify_register(GPFSEL1, (0x2 << 15));
+  write_to_register(GPSET0, (1 << 14));
+  modify_register(GPIO_PUP_PDN_CNTRL_REG0, (0 << 28) | (0 << 30));
+  delay();
 }
   
 void uart_init() {
+    // set gpio pins to ALT15
+  initialize_uart_pins();
+  /* write_to_register(AUX_IRQ, 0x00); */
   // enable the mini UART
   write_to_register(AUX_ENABLES, 0x01);
   // no interrupts needed
-  write_to_register(AUX_MU_IER_REG, 0x00);
   write_to_register(AUX_MU_CNTL_REG, 0x00);
-  write_to_register(AUX_MU_LCR_REG, 0x03);
+  write_to_register(AUX_MU_IER_REG, 0x00);
+  write_to_register(AUX_MU_LCR_REG, 3);
   write_to_register(AUX_MU_MCR_REG, 0x00);
   write_to_register(AUX_MU_IER_REG, 0x00);
   write_to_register(AUX_MU_IIR_REG, 0xc6);
-  write_to_register(AUX_MU_BAUD_REG, 270); // setting a 115200 baud rate
-  // set gpio pins to ALT15
-  initialize_uart_pins();
+  write_to_register(AUX_MU_BAUD_REG, 541); // 115200 baud rate
   // enable RX/TX
   write_to_register(AUX_MU_CNTL_REG, 0b11);
 }
 
 unsigned int is_ready_write() {
-  return read_from_register(AUX_MU_LSR_REG) & 0x20;
+  return read_from_register(AUX_MU_LSR_REG) & (1 << 5);
 }
 
 void write_byte(unsigned char b) {
@@ -117,8 +130,12 @@ void write_byte(unsigned char b) {
 }
 
 void write_to_uart(char *data) {
-  while (*data) {
+  while(*data) {
     write_byte(*data++);
   }
+}
+
+void write_char(unsigned char b) {
+  write_byte(b & 0xFF);
 }
 
