@@ -139,3 +139,15 @@ void write_char(unsigned char b) {
   write_byte(b & 0xFF);
 }
 
+unsigned int is_ready_to_read() {
+  return read_from_register(AUX_MU_LSR_REG) & 0x01;
+}
+
+unsigned int is_data_overan() {
+  return read_from_register(AUX_MU_LSR_REG) & (0x01 << 1);
+}
+
+unsigned char read_byte() {
+  return (unsigned char)read_from_register(AUX_MU_IO_REG);
+}
+
